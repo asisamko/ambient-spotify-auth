@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Ambient · Spotify</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0a0b0f; color: #f3f1ee; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-align: center; padding: 24px; }
+    .orb { width: 64px; height: 64px; margin: 0 auto 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #ffb46e 40%, transparent 72%); box-shadow: 0 0 40px #ffb46e88; animation: p 1.6s ease-in-out infinite; }
+    @keyframes p { 50% { transform: scale(0.88); opacity: 0.7; } }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    p { color: #a8a6a3; margin: 0; max-width: 420px; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="orb"></div>
+    <h1 id="t">Vraciam ťa do Ambient…</h1>
+    <p id="m">Chvíľku strpenia.</p>
+  </div>
+  <script>
+    // Spotify only accepts https redirect URIs (or http on 127.0.0.1), while
+    // Ambient runs on plain http inside the home network. Spotify sends the
+    // browser here; this page forwards it to the Ambient that started the
+    // login. Ambient put its own address into `state`
+    // ("<random>.<base64url(origin)>"). The code is useless without the PKCE
+    // verifier, which never leaves that Ambient server.
+    (function () {
+      var q = new URLSearchParams(location.search);
+      var state = q.get('state') || '';
+      var fail = function (title, msg) {
+        document.getElementById('t').textContent = title;
+        document.getElementById('m').textContent = msg;
+        document.querySelector('.orb').style.animation = 'none';
+      };
+      var dot = state.indexOf('.');
+      var origin = '';
+      try {
+        var b = state.slice(dot + 1).replace(/-/g, '+').replace(/_/g, '/');
+        origin = atob(b + '==='.slice((b.length + 3) % 4));
+      } catch (e) {}
+      // Only addresses inside a home network, so this page can't be used to
+      // bounce someone to an arbitrary site.
+      var local = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|[a-z0-9-]+(\.[a-z0-9-]+)*\.local|10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2})(:\d{1,5})?$/i;
+      if (dot < 1 || !local.test(origin)) return fail('Neplatný odkaz', 'Tento odkaz nepochádza z Ambient vo tvojej domácnosti. Začni prepojenie v Ambient znova.');
+      var params = new URLSearchParams();
+      ['code', 'state', 'error'].forEach(function (k) {
+        if (q.get(k)) params.set(k, q.get(k));
+      });
+      location.replace(origin + '/api/spotify/callback?' + params.toString());
+    })();
+  </script>
+</body>
+</html>
